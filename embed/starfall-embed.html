@@ -17,9 +17,11 @@
     width: 100%;
     height: 100%;
     display: block;
-    z-index: 0;
-    /* Fallback background while frames preload */
-    background: #000;
+    z-index: 1;
+    /* Frames have an alpha channel — keep the canvas transparent so whatever
+       you put behind it in Webflow (bg colour, gradient, image) shows through. */
+    background: transparent;
+    pointer-events: none;
   }
 </style>
 
@@ -34,7 +36,7 @@
 
     // 'sprite'   → few large sheet images (RECOMMENDED for pure-Webflow hosting)
     // 'sequence' → one file per frame (use with jsDelivr / Cloudinary / S3)
-    mode: 'sprite',
+    mode: 'sequence',
 
     // --- SPRITE MODE -----------------------------------------------------
     // Paste your 7 Webflow asset URLs here, IN ORDER (sheet_1 → sheet_7).
@@ -54,7 +56,7 @@
 
     // --- SEQUENCE MODE ---------------------------------------------------
     // {i} is replaced by the zero-padded frame number (0001, 0002, …)
-    sequenceUrl: 'https://cdn.jsdelivr.net/gh/USER/REPO@main/frames/frame_{i}.webp',
+    sequenceUrl: 'https://cdn.jsdelivr.net/gh/sansdesignteam-hub/3koncept-assets@main/frames/frame_{i}.webp',
     pad: 4,
 
     // --- SHARED ----------------------------------------------------------
@@ -82,7 +84,8 @@
   }
   gsap.registerPlugin(ScrollTrigger);
 
-  var ctx = canvas.getContext('2d', { alpha: false });
+  // alpha:true is REQUIRED — the frames are transparent PNG-style WebP.
+  var ctx = canvas.getContext('2d', { alpha: true });
   var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   var state = {
@@ -171,21 +174,35 @@
 
     var f = Math.min(CONFIG.frameCount - 1, Math.max(0, Math.round(frameFloat)));
 
+    // MUST clear first. Transparent frames composite on top of each other
+    // otherwise, and the section turns into a smeared accumulation of every
+    // frame the user has scrolled through.
+    // Resolve the source BEFORE clearing. If the asset isn't loaded yet we bail
+    // out and leave the previous frame on screen — clearing first would flash a
+    // hole in the animation every time we outrun the preloader.
+    var sheetIndex, local, sx, sy, img;
+
     if (CONFIG.mode === 'sprite') {
-      var sheetIndex = Math.floor(f / CONFIG.perSheet);
-      var local      = f % CONFIG.perSheet;
-      var sheet      = state.images[sheetIndex];
-      if (!sheet) return;                      // sheet not loaded yet → keep last painted frame
-      var sx = (local % CONFIG.cols) * CONFIG.cellWidth;
-      var sy = Math.floor(local / CONFIG.cols) * CONFIG.cellHeight;
+      sheetIndex = Math.floor(f / CONFIG.perSheet);
+      local      = f % CONFIG.perSheet;
+      img        = state.images[sheetIndex];
+      if (!img) return;
+      sx = (local % CONFIG.cols) * CONFIG.cellWidth;
+      sy = Math.floor(local / CONFIG.cols) * CONFIG.cellHeight;
+    } else {
+      img = state.images[f];
+      if (!img) return;
+    }
+
+    ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+
+    if (CONFIG.mode === 'sprite') {
       ctx.drawImage(
-        sheet,
+        img,
         sx, sy, CONFIG.cellWidth, CONFIG.cellHeight,
         state.dx, state.dy, state.dw, state.dh
       );
     } else {
-      var img = state.images[f];
-      if (!img) return;
       ctx.drawImage(img, state.dx, state.dy, state.dw, state.dh);
     }
   }

@@ -3,9 +3,17 @@
 build-sprites.py — kemas frame sequence jadi sprite sheet untuk canvas scrub.
 
 Pakai:
-    1. Ekstrak frame dari video:
-       ffmpeg -i source.mp4 -vf "fps=30,scale=1440:-2" \
-              -c:v libwebp -quality 72 -compression_level 6 frames/frame_%04d.webp
+    1. Ekstrak frame dari video.
+
+       WebM VP9 dengan alpha — WAJIB pakai -c:v libvpx-vp9. Decoder VP9 bawaan
+       ffmpeg mengabaikan alpha dan menghasilkan frame opaque tanpa peringatan:
+         ffmpeg -c:v libvpx-vp9 -i source.webm -vf "fps=30,scale=1440:-2" \
+                -pix_fmt rgba -compression_level 1 png/f_%04d.png
+         # lalu encode ke WebP (PIL/cwebp), pertahankan alpha
+
+       MP4 tanpa alpha:
+         ffmpeg -i source.mp4 -vf "fps=30,scale=1440:-2" \
+                -c:v libwebp -quality 72 -compression_level 6 frames/frame_%04d.webp
 
     2. python3 build-sprites.py --src frames --out sprites
 
@@ -47,15 +55,17 @@ def build(src_dir, out_dir, cell_width, cols, rows, quality):
     for s in range(sheet_count):
         chunk = frames[s * per_sheet:(s + 1) * per_sheet]
         rows_needed = math.ceil(len(chunk) / cols)
-        sheet = Image.new('RGB', (cell_width * cols, cell_height * rows_needed), (0, 0, 0))
+        # RGBA + fully-transparent fill: source frames have an alpha channel and
+        # flattening to RGB here would silently bake in a black background.
+        sheet = Image.new('RGBA', (cell_width * cols, cell_height * rows_needed), (0, 0, 0, 0))
 
         for i, name in enumerate(chunk):
-            img = Image.open(os.path.join(src_dir, name)).convert('RGB')
+            img = Image.open(os.path.join(src_dir, name)).convert('RGBA')
             img = img.resize((cell_width, cell_height), Image.LANCZOS)
             sheet.paste(img, ((i % cols) * cell_width, (i // cols) * cell_height))
 
         path = os.path.join(out_dir, f'starfall_sheet_{s + 1}.webp')
-        sheet.save(path, 'WEBP', quality=quality, method=6)
+        sheet.save(path, 'WEBP', quality=quality, alpha_quality=92, method=4)
         size = os.path.getsize(path)
         total_bytes += size
         print(f'  sheet {s + 1}/{sheet_count}  {sheet.size[0]}x{sheet.size[1]}  {size // 1024} KB')
