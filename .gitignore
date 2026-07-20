@@ -1,0 +1,10 @@
+# macOS
+.DS_Store
+
+# Arsip sumber — redundan karena frames/ sudah di-commit dalam bentuk ter-ekstrak.
+# Menyimpan zip DAN isinya berarti membayar ukuran repo dua kali.
+downloads/
+
+# Artefak build lokal
+__pycache__/
+*.pyc
