@@ -1,10 +1,10 @@
 {
-  "frameCount": 151,
+  "frameCount": 88,
   "cellWidth": 960,
-  "cellHeight": 728,
+  "cellHeight": 960,
   "cols": 5,
   "rows": 5,
   "perSheet": 25,
-  "sheets": 7,
+  "sheets": 4,
   "hasAlpha": true
 }
